@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dashboard de Exposición AED II — Encomiendas Puno (ABB + Grafo BFS)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+      },
+      colors: {
+        amber: {
+          400: '#FBBF24',
+          500: '#F59E0B',
+          200: '#FEF08A',
+        }
+      }
+    }
+  }
+}
+</script>
+<style>
+  /* Personalización de scrollbars y efectos Cyber Amber */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #0f172a; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #f59e0b; }
+
+  .amber-glow {
+    box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.25), 0 0 10px -5px rgba(251, 191, 36, 0.15);
+  }
+  .card-surface {
+    background: linear-gradient(145deg, rgba(30, 41, 59, 0.88), rgba(15, 23, 42, 0.95));
+    backdrop-filter: blur(12px);
+  }
+  html:not(.dark) .card-surface {
+    background: #ffffff;
+    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+  }
+  /* Colores de sintaxis en bloques de código */
+  .code-block { counter-reset: line; }
+  .code-line { display: block; padding: 0 1rem 0 0.5rem; border-left: 3px solid transparent; }
+  .code-line:hover { background: rgba(245, 158, 11, 0.08); border-left-color: #f59e0b; }
+  .code-line::before {
+    counter-increment: line;
+    content: counter(line);
+    display: inline-block;
+    width: 2.2rem;
+    margin-right: 1rem;
+    text-align: right;
+    color: #64748b;
+    user-select: none;
+    font-size: 0.75rem;
+  }
+  .kw { color: #fbbf24; font-weight: 600; }     /* Palabras clave en Ámbar */
+  .str { color: #34d399; }                     /* Strings en Esmeralda */
+  .num { color: #38bdf8; }                     /* Números en Cian */
+  .com { color: #94a3b8; font-style: italic; } /* Comentarios en Slate suave */
+  .typ { color: #fde047; }                     /* Clases/Tipos en Amarillo claro */
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 dark:bg-slate-950 dark:text-slate-100 light:bg-slate-50 light:text-slate-900 font-sans antialiased selection:bg-amber-500 selection:text-slate-950 transition-colors duration-300">
+
+<!-- BARRA SUPERIOR STICKY ESTILO DASHBOARD -->
+<header class="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 font-extrabold text-lg shadow-lg shadow-amber-500/20">
+        AED2
+      </div>
+      <div>
+        <span class="text-xs uppercase tracking-wider font-bold text-amber-400 block">Guía Maestra de Exposición</span>
+        <h1 class="text-sm sm:text-base font-bold text-white truncate">Sistema de Encomiendas Puno (ABB + Grafo BFS)</h1>
+      </div>
+    </div>
+
+    <!-- Navegación rápida -->
+    <nav class="hidden md:flex items-center gap-1 text-sm font-medium">
+      <a href="#sec-resumen" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-amber-400 hover:bg-slate-800/60 transition">1. Resumen & Flujo</a>
+      <a href="#sec-clases" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-amber-400 hover:bg-slate-800/60 transition">2. Explorador de 5 Clases</a>
+      <a href="#sec-simulador" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-amber-400 hover:bg-slate-800/60 transition">3. Simulador en Vivo</a>
+      <a href="#sec-preguntas" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-amber-400 hover:bg-slate-800/60 transition">4. Preguntas de Examen</a>
+    </nav>
+
+    <!-- Botón Modo Claro / Oscuro -->
+    <button id="btnTheme" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-semibold text-xs transition">
+      <span id="themeIcon">☀️</span>
+      <span id="themeText">Modo Claro</span>
+    </button>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+
+  <!-- ================= 1. HERO DASHBOARD & RESUMEN EJECUTIVO ================= -->
+  <section id="sec-resumen" class="space-y-6">
+    <div class="relative rounded-3xl p-6 sm:p-8 border border-amber-500/30 card-surface amber-glow overflow-hidden">
+      <div class="absolute -right-16 -top-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500 text-slate-950">PROYECTO FINAL SWING</span>
+        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Estructura 1: Árbol ABB</span>
+        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">Estructura 2: Grafo + Cola BFS</span>
+      </div>
+      <h2 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-white mb-3">
+        Guía Maestra de Exposición: <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-amber-400 to-yellow-200">Encomiendas y Rutas Puno</span>
+      </h2>
+      <p class="text-slate-300 max-w-3xl text-sm sm:text-base leading-relaxed">
+        Todo tu código Java explicado bloque por bloque y función por función. Diseñado para que domines qué hace cada línea de tus <b>5 archivos</b> (<code>clsEncomienda</code>, <code>clsArbolAbb</code>, <code>clsGrafoRutas</code>, <code>frmEncomiendas</code> y <code>main</code>) en la presentación del martes y viernes.
+      </p>
+    </div>
+
+    <!-- Tarjetas de Problema, Solución, Objetivos y Plan -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <!-- Card 1: Problema -->
+      <div class="rounded-2xl p-5 border border-slate-800 card-surface flex flex-col justify-between">
+        <div>
+          <div class="w-9 h-9 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold mb-3">01</div>
+          <h3 class="font-bold text-lg text-white mb-2">El Problema Real</h3>
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            Las agencias de envíos entre las 7 provincias de Puno (<b>Juliaca, Puno, Lampa, Pucará, Ayaviri, Azángaro y Huancané</b>) demoran demasiado buscando paquetes en listas desordenadas $O(n)$ y necesitan saber por qué ciudades intermedias despachar cada paquete haciendo la <b>menor cantidad de paradas</b>.
+          </p>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-800/80 text-xs text-amber-400 font-mono">Caso real: Transporte interprovincial</div>
+      </div>
+
+      <!-- Card 2: Solución 2 Estructuras -->
+      <div class="rounded-2xl p-5 border border-slate-800 card-surface flex flex-col justify-between">
+        <div>
+          <div class="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold mb-3">02</div>
+          <h3 class="font-bold text-lg text-white mb-2">La Solución (2 Estructuras)</h3>
+          <ul class="text-xs sm:text-sm text-slate-300 space-y-2">
+            <li><b class="text-amber-300">1. clsArbolAbb (ABB):</b> Guarda y ordena cada encomienda por su <code>codTracking</code> para buscar, insertar y eliminar en $O(h)$.</li>
+            <li><b class="text-cyan-300">2. clsGrafoRutas (Grafo + Cola):</b> Conecta las 7 ciudades en una Lista de Adyacencia y usa <b>BFS con una Cola FIFO</b> para hallar el camino con menos tramos.</li>
+          </ul>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-800/80 text-xs text-emerald-400 font-mono">Cubre Semanas 1, 2, 3 y 4</div>
+      </div>
+
+      <!-- Card 3: Objetivos -->
+      <div class="rounded-2xl p-5 border border-slate-800 card-surface flex flex-col justify-between">
+        <div>
+          <div class="w-9 h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 font-bold mb-3">03</div>
+          <h3 class="font-bold text-lg text-white mb-2">Objetivos del Proyecto</h3>
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            <b class="text-amber-300">General:</b> Desarrollar un sistema en Java Swing que integre un ABB y un Grafo BFS para gestionar encomiendas.<br/>
+            <b class="text-cyan-300">Específicos:</b> Programar inserción, búsqueda, eliminación (3 casos) e Inorden en el ABB; y calcular la ruta mínima por niveles con una Cola en el Grafo.
+          </p>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-800/80 text-xs text-cyan-400 font-mono">Interfaz: JFrame + JTextArea</div>
+      </div>
+
+      <!-- Card 4: Plan Martes y Viernes -->
+      <div class="rounded-2xl p-5 border border-slate-800 card-surface flex flex-col justify-between">
+        <div>
+          <div class="w-9 h-9 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300 font-bold mb-3">04</div>
+          <h3 class="font-bold text-lg text-white mb-2">Plan Martes y Viernes</h3>
+          <ul class="text-xs sm:text-sm text-slate-300 space-y-2">
+            <li><b class="text-amber-300">Martes (Mitad 1):</b> Problema, objetivos, modelo <code>clsEncomienda</code> y estructura del árbol <code>clsArbolAbb</code>.</li>
+            <li><b class="text-emerald-300">Viernes (Mitad 2):</b> Estructura <code>clsGrafoRutas</code> (BFS con Cola), conexión con <code>frmEncomiendas</code> y <code>main</code> en vivo.</li>
+          </ul>
+        </div>
+        <div class="mt-4 pt-3 border-t border-slate-800/80 text-xs text-purple-300 font-mono">100% CamelCase modular</div>
+      </div>
+    </div>
+
+    <!-- MAPA MENTAL VISUAL DEL FLUJO DE LAS 5 CLASES -->
+    <div class="rounded-2xl p-6 border border-slate-800 card-surface">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Arquitectura del Programa</span>
+          <h3 class="text-lg font-bold text-white">Mapa Mental: ¿Cómo se comunican tus 5 archivos Java?</h3>
+        </div>
+        <span class="text-xs text-slate-400">Haz clic en cualquier tarjeta abajo para ir a su código explicado</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-center text-center">
+        <!-- Paso 1: main -->
+        <button onclick="activarTab('main')" class="p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 transition text-left group">
+          <span class="text-xs font-mono text-amber-400 block">1. Punto de partida</span>
+          <b class="text-base text-white group-hover:text-amber-300">main.java</b>
+          <p class="text-xs text-slate-300 mt-1">Pone el tema Windows, crea el Grafo (8 rutas) y el Árbol (4 paquetes).</p>
+        </button>
+
+        <!-- Paso 2: clsEncomienda -->
+        <button onclick="activarTab('encomienda')" class="p-4 rounded-xl border border-slate-700 bg-slate-900/70 hover:border-amber-400 transition text-left group">
+          <span class="text-xs font-mono text-emerald-400 block">2. Molde del Paquete</span>
+          <b class="text-base text-white group-hover:text-amber-300">clsEncomienda.java</b>
+          <p class="text-xs text-slate-300 mt-1">Guarda <code>codTracking</code>, <code>nomDestinatario</code>, origen y destino.</p>
+        </button>
+
+        <!-- Paso 3: clsArbolAbb -->
+        <button onclick="activarTab('arbol')" class="p-4 rounded-xl border border-slate-700 bg-slate-900/70 hover:border-amber-400 transition text-left group">
+          <span class="text-xs font-mono text-amber-400 block">3. Estructura 1 (ABB)</span>
+          <b class="text-base text-white group-hover:text-amber-300">clsArbolAbb.java</b>
+          <p class="text-xs text-slate-300 mt-1">Guarda cada <code>clsEncomienda</code> dentro de un <code>Nodo</code> ordenado por código.</p>
+        </button>
+
+        <!-- Paso 4: clsGrafoRutas -->
+        <button onclick="activarTab('grafo')" class="p-4 rounded-xl border border-slate-700 bg-slate-900/70 hover:border-amber-400 transition text-left group">
+          <span class="text-xs font-mono text-cyan-400 block">4. Estructura 2 (BFS)</span>
+          <b class="text-base text-white group-hover:text-amber-300">clsGrafoRutas.java</b>
+          <p class="text-xs text-slate-300 mt-1">Conecta las 7 ciudades y calcula la ruta más corta con una Cola FIFO.</p>
+        </button>
+
+        <!-- Paso 5: frmEncomiendas -->
+        <button onclick="activarTab('frm')" class="p-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 transition text-left group">
+          <span class="text-xs font-mono text-emerald-300 block">5. Ventana Swing</span>
+          <b class="text-base text-white group-hover:text-emerald-300">frmEncomiendas.java</b>
+          <p class="text-xs text-slate-300 mt-1">Recibe el Árbol y el Grafo desde <code>main</code> y los conecta con los 4 botones.</p>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. EXPLORADOR INTERACTIVO DE LAS 5 CLASES (TABS) ================= -->
+  <section id="sec-clases" class="space-y-6">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Corazón del Proyecto</span>
+        <h2 class="text-2xl sm:text-3xl font-extrabold text-white">Explorador Clase por Clase y Función por Función</h2>
+        <p class="text-sm text-slate-400">Selecciona una pestaña para ver su código completo a la izquierda y el desglose detallado de cada método a la derecha.</p>
+      </div>
+
+      <!-- Buscador rápido de funciones -->
+      <div class="relative w-full md:w-80">
+        <input id="inputBuscarFuncion" type="text" placeholder="🔍 Buscar función (ej. bfs, eliminar, inorden)..." class="w-full pl-4 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"/>
+      </div>
+    </div>
+
+    <!-- Barra de Pestañas (Tabs) -->
+    <div class="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800" id="tabButtons">
+      <button data-tab="encomienda" class="tab-btn flex-1 min-w-[160px] py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition bg-amber-500 text-slate-950 shadow-md">
+        1. clsEncomienda.java
+      </button>
+      <button data-tab="arbol" class="tab-btn flex-1 min-w-[160px] py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition text-slate-300 hover:text-amber-400">
+        2. clsArbolAbb.java (ABB)
+      </button>
+      <button data-tab="grafo" class="tab-btn flex-1 min-w-[160px] py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition text-slate-300 hover:text-amber-400">
+        3. clsGrafoRutas.java (BFS)
+      </button>
+      <button data-tab="frm" class="tab-btn flex-1 min-w-[160px] py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition text-slate-300 hover:text-amber-400">
+        4. frmEncomiendas.java
+      </button>
+      <button data-tab="main" class="tab-btn flex-1 min-w-[160px] py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition text-slate-300 hover:text-amber-400">
+        5. main.java
+      </button>
+    </div>
+
+    <!-- Contenedor dinámico de la pestaña activa -->
+    <div id="tabContentArea" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <!-- Columna Izquierda: Código Java con resaltado y botón copiar (5 columnas en desktop) -->
+      <div class="lg:col-span-5 rounded-2xl border border-slate-800 bg-slate-900/95 overflow-hidden lg:sticky lg:top-20">
+        <div class="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+            <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+            <span id="codeFileTitle" class="ml-2 font-mono text-xs font-bold text-amber-300">clsEncomienda.java</span>
+          </div>
+          <button id="btnCopyCode" class="px-3 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/30 text-xs font-bold transition">
+            Copiar Código
+          </button>
+        </div>
+        <pre id="codeDisplay" class="code-block font-mono text-xs leading-relaxed py-4 overflow-x-auto max-h-[640px] text-slate-200"></pre>
+      </div>
+
+      <!-- Columna Derecha: Tarjetas de explicación función por función (7 columnas en desktop) -->
+      <div class="lg:col-span-7 space-y-4" id="explanationCards"></div>
+    </div>
+  </section>
+
+  <!-- ================= 3. SIMULADOR INTERACTIVO VISUAL (EN VIVO) ================= -->
+  <section id="sec-simulador" class="space-y-6">
+    <div class="rounded-3xl p-6 sm:p-8 border border-amber-500/30 card-surface amber-glow">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Laboratorio Interactivo en Vivo</span>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-white">Simulador Exacto de tu Ventana <code>frmEncomiendas</code></h2>
+          <p class="text-sm text-slate-300">
+            Ejecuta exactamente la misma lógica de tus clases Java: prueba insertar un paquete, buscar los saltos en el ABB o calcular la ruta más corta con BFS entre las 7 provincias de Puno.
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button id="btnSimReset" class="px-3 py-2 rounded-xl border border-slate-700 bg-slate-800 hover:border-amber-400 text-xs font-bold text-amber-300 transition">
+            🔄 Restaurar 4 Paquetes Iniciales
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- Panel de Controles (Simula la parte superior de frmEncomiendas) -->
+        <div class="lg:col-span-5 rounded-2xl p-5 bg-slate-950/90 border border-slate-800 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <span class="text-xs font-mono font-bold text-amber-400">FORMULARIO SWING (jpPrin)</span>
+            <span class="text-xs text-emerald-400 font-mono">● Activo</span>
+          </div>
+
+          <div class="space-y-3 text-sm">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1">Código (txtCodigo - int):</label>
+              <input id="simCod" type="number" value="30" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"/>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1">Destinatario (txtDest - String):</label>
+              <input id="simDest" type="text" value="Pedro Apaza" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"/>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1">Origen (cbxOrigen):</label>
+                <select id="simOri" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-amber-400"></select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1">Destino (cbxDestino):</label>
+                <select id="simFin" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-amber-400"></select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Los 4 Botones de tu ventana -->
+          <div class="grid grid-cols-2 gap-2.5 pt-2">
+            <button id="bSimIns" class="py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition shadow-md">
+              1. Insertar (btnIns)
+            </button>
+            <button id="bSimBus" class="py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs transition shadow-md">
+              2. Buscar (btnBuscar)
+            </button>
+            <button id="bSimEli" class="py-2.5 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/40 font-bold text-xs transition">
+              3. Eliminar (btnEli)
+            </button>
+            <button id="bSimMos" class="py-2.5 px-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/40 font-bold text-xs transition">
+              4. Mostrar todo (btnMos)
+            </button>
+          </div>
+
+          <!-- Botones rápidos de prueba para la exposición -->
+          <div class="pt-3 border-t border-slate-800">
+            <span class="text-xs text-slate-400 block mb-2">Pruebas rápidas con un clic:</span>
+            <div class="flex flex-wrap gap-1.5">
+              <button onclick="probarBusquedaRapida(30)" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-xs font-mono text-amber-300">Buscar 30 (LAMPA→AYAVIRI)</button>
+              <button onclick="probarBusquedaRapida(20)" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-xs font-mono text-amber-300">Buscar 20 (3 saltos)</button>
+              <button onclick="probarBusquedaRapida(70)" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-xs font-mono text-amber-300">Buscar 70 (PUNO→HUANCANE)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Salida en vivo de txtResul -->
+        <div class="lg:col-span-7 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden">
+          <div class="px-4 py-2.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <span class="font-mono text-xs font-bold text-amber-400">SALIDA EN VIVO DE txtResul (JTextArea)</span>
+            <span class="text-xs font-mono text-slate-400">Formato con flechas -></span>
+          </div>
+          <pre id="simOut" class="p-5 font-mono text-xs sm:text-sm text-emerald-300 whitespace-pre-wrap leading-relaxed min-h-[340px]"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. PREGUNTAS FIJAS DEL PROFESOR ================= -->
+  <section id="sec-preguntas" class="space-y-6">
+    <div>
+      <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Defensa Oral Segura</span>
+      <h2 class="text-2xl sm:text-3xl font-extrabold text-white">Preguntas Fijas del Profesor y Cómo Responderlas</h2>
+      <p class="text-sm text-slate-400">Haz clic en cada pregunta para desplegar la respuesta exacta basada en tu código.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <details class="group rounded-2xl border border-slate-800 card-surface p-5 open:border-amber-500/50" open>
+        <summary class="cursor-pointer font-bold text-white flex items-center justify-between gap-2">
+          <span>1. ¿Por qué el método <code>obtenerInordenFlechas()</code> muestra los paquetes ordenados sin usar burbuja ni quicksort?</span>
+          <span class="text-amber-400 group-open:rotate-180 transition">▼</span>
+        </summary>
+        <p class="mt-3 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800 pt-3">
+          Porque al insertar en un <b>Árbol Binario de Búsqueda (ABB)</b>, todo código menor que un nodo va siempre a su subárbol izquierdo y todo código mayor va a su subárbol derecho. Como el recorrido <code>inordenRec</code> visita en orden <b>1° Izquierda (menores) → 2° Raíz → 3° Derecha (mayores)</b>, los paquetes salen automáticamente ordenados de menor a mayor (<code>20 -> 30 -> 50 -> 70</code>) en tiempo $O(n)$.
+        </p>
+      </details>
+
+      <details class="group rounded-2xl border border-slate-800 card-surface p-5 open:border-amber-500/50" open>
+        <summary class="cursor-pointer font-bold text-white flex items-center justify-between gap-2">
+          <span>2. ¿Dónde están usando Pilas o Colas (temas de la Semana 1) dentro de este proyecto?</span>
+          <span class="text-amber-400 group-open:rotate-180 transition">▼</span>
+        </summary>
+        <p class="mt-3 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800 pt-3">
+          En dos lugares fundamentales:<br/>
+          • <b>Cola FIFO explícita:</b> En <code>clsGrafoRutas.caminoMasCortoBfs()</code> usamos <code>Queue&lt;Integer&gt; cola = new ArrayDeque&lt;&gt;()</code> con <code>cola.add()</code> y <code>cola.poll()</code> para recorrer las ciudades vecinas nivel por nivel.<br/>
+          • <b>Pila de llamadas (Call Stack):</b> En <code>clsArbolAbb</code>, los métodos recursivos <code>buscarRec</code>, <code>insertarRec</code>, <code>eliminarRec</code> e <code>inordenRec</code> apilan cada llamada en memoria hasta llegar al caso base <code>n == null</code>.
+        </p>
+      </details>
+
+      <details class="group rounded-2xl border border-slate-800 card-surface p-5 open:border-amber-500/50">
+        <summary class="cursor-pointer font-bold text-white flex items-center justify-between gap-2">
+          <span>3. ¿Qué hace exactamente el Caso 3 de <code>eliminarRec</code> cuando borramos un nodo que tiene 2 hijos (como el 50)?</span>
+          <span class="text-amber-400 group-open:rotate-180 transition">▼</span>
+        </summary>
+        <p class="mt-3 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800 pt-3">
+          Si un nodo tiene dos hijos, no podemos borrarlo directamente porque dejaríamos dos ramas huérfanas. Nuestro código busca al <b>sucesor inorden</b> llamando a <code>Nodo sucesor = minimo(n.derecho)</code> (da un paso a la derecha y luego baja todo a la izquierda hasta hallar el menor de los mayores). Luego copia ese paquete con <code>n.dato = sucesor.dato</code> y finalmente elimina el nodo original del sucesor con <code>n.derecho = eliminarRec(n.derecho, sucesor.dato.getCodTracking())</code>.
+        </p>
+      </details>
+
+      <details class="group rounded-2xl border border-slate-800 card-surface p-5 open:border-amber-500/50">
+        <summary class="cursor-pointer font-bold text-white flex items-center justify-between gap-2">
+          <span>4. ¿Para qué sirven los arreglos <code>visitado[]</code> y <code>padre[]</code> en <code>caminoMasCortoBfs</code>?</span>
+          <span class="text-amber-400 group-open:rotate-180 transition">▼</span>
+        </summary>
+        <p class="mt-3 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800 pt-3">
+          • <code>visitado[]</code> evita que el algoritmo entre en un bucle infinito cuando hay ciclos en el mapa (como el triángulo <b>JULIACA - AZANGARO - HUANCANE</b>), marcando cada ciudad apenas se encola.<br/>
+          • <code>padre[]</code> guarda qué ciudad descubrió a cuál (<code>padre[w] = v</code>). Así, cuando llegamos al destino <code>t</code>, retrocedemos en un bucle <code>for (int v = t; v != -1; v = padre[v])</code> desde el destino hasta el origen para reconstruir la ruta exacta con flechas.
+        </p>
+      </details>
+    </div>
+  </section>
+
+</main>
+
+<footer class="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500">
+  Guía interactiva generada a medida para tu código de <b>Algoritmos y Estructuras de Datos II</b> • Región Puno
+</footer>
+
+<script>
+const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+/* ================= BASE DE DATOS DE TUS 5 CLASES Y TODAS SUS FUNCIONES ================= */
+const CLASES_DATA = {
+  encomienda: {
+    archivo: "clsEncomienda.java",
+    codigo: `public class clsEncomienda {
+    // Atributos en camelCase que representan los datos reales del paquete
+    private int codTracking;
+    private String nomDestinatario;
+    private String ciudadOrigen;
+    private String ciudadDestino;
+
+    // Constructor: recibe los 4 datos desde las cajas de texto y combos del panel
+    public clsEncomienda(int codigoTracking, String nombreDestinatario, String ciudadOrigen, String ciudadDestino) {
+        this.codTracking = codigoTracking;
+        this.nomDestinatario = nombreDestinatario;
+        this.ciudadOrigen = ciudadOrigen;
+        this.ciudadDestino = ciudadDestino;
+    }
+
+    // Métodos getter y setter para leer o actualizar los datos desde el Árbol
+    public int getCodTracking() {
+        return codTracking;
+    }
+
+    public void setCodTracking(int codTracking) {
+        this.codTracking = codTracking;
+    }
+
+    public String getNomDestinatario() {
+        return nomDestinatario;
+    }
+
+    public String getCiudadOrigen() {
+        return ciudadOrigen;
+    }
+
+    public String getCiudadDestino() {
+        return ciudadDestino;
+    }
+
+    // Método para mostrar el paquete resumido en una sola línea cuando hagamos el recorrido Inorden
+    public String obtenerResumenTexto() {
+        return "[" + codTracking + " | Cliente: " + nomDestinatario
+                + " | Ruta: " + ciudadOrigen + " -> " + ciudadDestino + "]";
+    }
+}`,
+    funciones: [
+      {
+        titulo: "Atributos Privados (Encapsulamiento)",
+        firma: "private int codTracking; private String nomDestinatario, ciudadOrigen, ciudadDestino;",
+        badge: "Lineas 3 - 6",
+        color: "amber",
+        recibe: "Declaración de variables de instancia de la clase.",
+        hace: "Guarda las 4 propiedades de una encomienda real. El atributo más importante para la estructura de datos es <code>codTracking</code> (entero), porque será la <b>llave de comparación</b> con la que el Árbol Binario de Búsqueda decidirá si el paquete va a la izquierda o a la derecha.",
+        devuelve: "No aplica (son atributos internos protegidos con private)."
+      },
+      {
+        titulo: "Constructor de la Clase",
+        firma: "public clsEncomienda(int codigoTracking, String nombreDestinatario, String ciudadOrigen, String ciudadDestino)",
+        badge: "Lineas 9 - 14",
+        color: "emerald",
+        recibe: "Los 4 datos capturados desde el formulario Swing o desde <code>main.java</code>.",
+        hace: "Inicializa un nuevo objeto <code>clsEncomienda</code> asignando cada parámetro a los atributos de la clase usando la palabra reservada <code>this</code>.",
+        devuelve: "La instancia recién creada lista para meterse dentro de un nodo del árbol."
+      },
+      {
+        titulo: "Métodos Getters y Setters",
+        firma: "getCodTracking(), setCodTracking(...), getNomDestinatario(), getCiudadOrigen(), getCiudadDestino()",
+        badge: "Lineas 17 - 35",
+        color: "cyan",
+        recibe: "Ningún parámetro en los getters; un <code>int</code> en <code>setCodTracking</code>.",
+        hace: "Permiten que <code>clsArbolAbb</code> compare los códigos con <code>n.dato.getCodTracking()</code> y que <code>frmEncomiendas</code> extraiga la ciudad de origen y destino al buscar un paquete para enviárselos al Grafo.",
+        devuelve: "El valor del atributo correspondiente (<code>int</code> o <code>String</code>)."
+      },
+      {
+        titulo: "Método de Formato con Flechas",
+        firma: "public String obtenerResumenTexto()",
+        badge: "Lineas 38 - 41",
+        color: "amber",
+        recibe: "Nada (usa los propios atributos del objeto).",
+        hace: "Concatena todos los datos del paquete en una sola cadena legible con flechas: <code>[30 | Cliente: Ana Mamani | Ruta: LAMPA -> AYAVIRI]</code>. Se llama desde el recorrido Inorden del árbol y desde el botón Buscar.",
+        devuelve: "Un <code>String</code> formateado listo para mostrarse en <code>txtResul</code>."
+      }
+    ]
+  },
+
+  arbol: {
+    archivo: "clsArbolAbb.java",
+    codigo: `public class clsArbolAbb {
+
+    // Igual que en el HTML del profesor: el Nodo va adentro del árbol
+    static class Nodo {
+        clsEncomienda dato;
+        Nodo izquierdo, derecho;
+
+        Nodo(clsEncomienda dato) {
+            this.dato = dato;
+        }
+    }
+
+    private Nodo raiz; // El árbol solo guarda la raíz
+
+    // 1. BUSCAR POR CÓDIGO (Con flechas del camino recorrido)
+    public clsEncomienda buscar(int cod) {
+        return buscarRec(raiz, cod);
+    }
+
+    private clsEncomienda buscarRec(Nodo n, int cod) {
+        if (n == null) return null; // Caso base: no está
+        if (cod == n.dato.getCodTracking()) return n.dato; // Encontrado
+        if (cod < n.dato.getCodTracking()) {
+            return buscarRec(n.izquierdo, cod); // Menor: va a la izquierda
+        }
+        return buscarRec(n.derecho, cod); // Mayor: va a la derecha
+    }
+
+    // Muestra el camino con flechas: 50 -> 30 -> 20
+    public String obtenerCaminoBusqueda(int cod) {
+        StringBuilder camino = new StringBuilder("Raíz ");
+        Nodo actual = raiz;
+        while (actual != null) {
+            camino.append(actual.dato.getCodTracking());
+            if (cod == actual.dato.getCodTracking()) break;
+            camino.append(" -> ");
+            actual = (cod < actual.dato.getCodTracking()) ? actual.izquierdo : actual.derecho;
+        }
+        return camino.toString();
+    }
+
+    // 2. INSERTAR ENCOMIENDA
+    public void insertar(clsEncomienda enc) {
+        raiz = insertarRec(raiz, enc);
+    }
+
+    private Nodo insertarRec(Nodo n, clsEncomienda enc) {
+        if (n == null) return new Nodo(enc); // Hueco encontrado: crea el nodo
+        if (enc.getCodTracking() < n.dato.getCodTracking()) {
+            n.izquierdo = insertarRec(n.izquierdo, enc);
+        } else if (enc.getCodTracking() > n.dato.getCodTracking()) {
+            n.derecho = insertarRec(n.derecho, enc);
+        }
+        return n;
+    }
+
+    // 3. ELIMINAR POR CÓDIGO (Los 3 casos del HTML)
+    public void eliminar(int cod) {
+        raiz = eliminarRec(raiz, cod);
+    }
+
+    private Nodo eliminarRec(Nodo n, int cod) {
+        if (n == null) return null;
+        if (cod < n.dato.getCodTracking()) {
+            n.izquierdo = eliminarRec(n.izquierdo, cod);
+        } else if (cod > n.dato.getCodTracking()) {
+            n.derecho = eliminarRec(n.derecho, cod);
+        } else {
+            // Casos 1 y 2: hoja o un solo hijo
+            if (n.izquierdo == null) return n.derecho;
+            if (n.derecho == null) return n.izquierdo;
+            // Caso 3: dos hijos -> reemplaza con el menor de la derecha (sucesor)
+            Nodo sucesor = minimo(n.derecho);
+            n.dato = sucesor.dato;
+            n.derecho = eliminarRec(n.derecho, sucesor.dato.getCodTracking());
+        }
+        return n;
+    }
+
+    private Nodo minimo(Nodo n) {
+        while (n.izquierdo != null) n = n.izquierdo;
+        return n;
+    }
+
+    // 4. RECORRIDO INORDEN CON FLECHAS (Sale ordenado de menor a mayor)
+    public String obtenerInordenFlechas() {
+        if (raiz == null) return "(Árbol vacío)";
+        StringBuilder sb = new StringBuilder();
+        inordenRec(raiz, sb);
+        return sb.toString();
+    }
+
+    private void inordenRec(Nodo n, StringBuilder sb) {
+        if (n == null) return;
+        inordenRec(n.izquierdo, sb); // 1. Izquierda
+        sb.append(" -> ").append(n.dato.obtenerResumenTexto()).append("\\n"); // 2. Raíz
+        inordenRec(n.derecho, sb);   // 3. Derecha
+    }
+}`,
+    funciones: [
+      {
+        titulo: "Clase Interna Nodo y Atributo Raíz",
+        firma: "static class Nodo { clsEncomienda dato; Nodo izquierdo, derecho; } / private Nodo raiz;",
+        badge: "Lineas 4 - 13",
+        color: "amber",
+        recibe: "El constructor <code>Nodo(clsEncomienda dato)</code> recibe el paquete a guardar.",
+        hace: "En vez de crear un archivo extra, declaramos <code>Nodo</code> dentro del árbol igual que en el material del curso. Cada nodo tiene el paquete <code>dato</code> y dos enlaces (<code>izquierdo</code> para códigos menores y <code>derecho</code> para códigos mayores). El árbol completo solo necesita guardar la referencia al primer nodo: <code>private Nodo raiz</code>.",
+        devuelve: "Un nodo hoja cuyos punteros <code>izquierdo</code> y <code>derecho</code> inician en <code>null</code>."
+      },
+      {
+        titulo: "1. Búsqueda Recursiva en el ABB — O(h)",
+        firma: "public clsEncomienda buscar(int cod) / private clsEncomienda buscarRec(Nodo n, int cod)",
+        badge: "Lineas 16 - 27",
+        color: "emerald",
+        recibe: "El código entero <code>cod</code> que el usuario escribió en <code>txtCodigo</code>.",
+        hace: "1° Si <code>n == null</code> (caso base), llegó al final sin encontrarlo y retorna <code>null</code>.<br/>2° Si <code>cod == n.dato.getCodTracking()</code>, ¡lo encontró! Retorna el objeto <code>clsEncomienda</code>.<br/>3° Si <code>cod &lt; n.dato.getCodTracking()</code>, busca recursivamente solo en <code>n.izquierdo</code>; de lo contrario, busca solo en <code>n.derecho</code>, descartando la mitad del árbol en cada paso.",
+        devuelve: "El objeto <code>clsEncomienda</code> encontrado, o <code>null</code> si no existe."
+      },
+      {
+        titulo: "Rastro de Saltos con Flechas",
+        firma: "public String obtenerCaminoBusqueda(int cod)",
+        badge: "Lineas 30 - 40",
+        color: "cyan",
+        recibe: "El código <code>cod</code> de una encomienda que ya sabemos que existe.",
+        hace: "Empieza en <code>actual = raiz</code> y mediante un ciclo <code>while</code> va anotando cada nodo por el que pasa separado por <code>\" -> \"</code>. Usa el operador ternario <code>(cod &lt; actual.dato.getCodTracking()) ? actual.izquierdo : actual.derecho</code> para bajar por la rama correcta hasta llegar al nodo buscado.",
+        devuelve: "Un texto como <code>\"Raíz 50 -> 30 -> 20\"</code> que demuestra cómo bajó por el árbol."
+      },
+      {
+        titulo: "2. Inserción Recursiva en el ABB — O(h)",
+        firma: "public void insertar(clsEncomienda enc) / private Nodo insertarRec(Nodo n, clsEncomienda enc)",
+        badge: "Lineas 43 - 55",
+        color: "amber",
+        recibe: "El nuevo objeto <code>clsEncomienda enc</code>.",
+        hace: "Compara el código de la nueva encomienda con cada nodo desde la raíz. Si es menor baja por la izquierda (<code>n.izquierdo = insertarRec(...)</code>) y si es mayor baja por la derecha (<code>n.derecho = insertarRec(...)</code>). Cuando encuentra un enlace vacío (<code>n == null</code>), crea ahí mismo la hoja con <code>return new Nodo(enc)</code> y la deja enganchada a su padre.",
+        devuelve: "La referencia al nodo actualizado para mantener los enlaces del árbol intactos."
+      },
+      {
+        titulo: "3. Eliminación con los 3 Casos y Mínimo — O(h)",
+        firma: "eliminar(int cod) / eliminarRec(Nodo n, int cod) / minimo(Nodo n)",
+        badge: "Lineas 58 - 83",
+        color: "emerald",
+        recibe: "El código entero <code>cod</code> del paquete que se desea borrar.",
+        hace: "Primero localiza el nodo bajando por izquierda o derecha. Al encontrarlo, resuelve los <b>3 casos del ABB</b>:<br/>• <b>Caso 1 (Hoja):</b> <code>n.izquierdo == null</code> retorna <code>n.derecho</code> (que es <code>null</code>), borrando la hoja.<br/>• <b>Caso 2 (1 solo hijo):</b> Retorna el único hijo existente para que el abuelo adopte directamente al nieto.<br/>• <b>Caso 3 (2 hijos):</b> Llama a <code>minimo(n.derecho)</code> (que baja todo a la izquierda del subárbol derecho) para obtener el <b>sucesor inorden</b>, copia su dato en el nodo actual y elimina recursivamente el sucesor repetido.",
+        devuelve: "La raíz del subárbol ya reestructurado sin romper la regla del ABB."
+      },
+      {
+        titulo: "4. Recorrido Inorden con Flechas — O(n)",
+        firma: "public String obtenerInordenFlechas() / private void inordenRec(Nodo n, StringBuilder sb)",
+        badge: "Lineas 86 - 98",
+        color: "cyan",
+        recibe: "El nodo actual <code>n</code> y un acumulador de texto <code>StringBuilder sb</code>.",
+        hace: "Aplica la regla recursiva <b>Izquierda → Raíz → Derecha</b>: primero llama a <code>inordenRec(n.izquierdo, sb)</code>, luego agrega el texto de la encomienda actual con una flecha <code>\" -> \"</code>, y finalmente llama a <code>inordenRec(n.derecho, sb)</code>.",
+        devuelve: "Todas las encomiendas ordenadas estrictamente de menor a mayor código."
+      }
+    ]
+  },
+
+  grafo: {
+    archivo: "clsGrafoRutas.java",
+    codigo: `import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Queue;
+
+public class clsGrafoRutas {
+
+    private String[] nomCiudades = {"JULIACA", "PUNO", "LAMPA", "PUCARA", "AYAVIRI", "AZANGARO", "HUANCANE"};
+    private List<List<Integer>> lista; // Lista de adyacencia
+
+    public clsGrafoRutas() {
+        lista = new ArrayList<>();
+        for (int i = 0; i < nomCiudades.length; i++) {
+            lista.add(new ArrayList<>());
+        }
+    }
+
+    public String[] getNomCiudades() {
+        return nomCiudades;
+    }
+
+    public int indice(String nombre) {
+        for (int i = 0; i < nomCiudades.length; i++) {
+            if (nomCiudades[i].equals(nombre)) return i;
+        }
+        return -1;
+    }
+
+    // Agrega una carretera en doble sentido (No dirigido)
+    public void agregarArista(String a, String b) {
+        int i = indice(a);
+        int j = indice(b);
+        lista.get(i).add(j);
+        lista.get(j).add(i);
+    }
+
+    // BFS con Cola para hallar el camino más corto con flechas: LAMPA -> JULIACA -> PUCARA -> AYAVIRI
+    public String caminoMasCortoBfs(String origen, String destino) {
+        if (origen.equals(destino)) return origen + " -> " + destino + " (0 tramos)";
+
+        int s = indice(origen);
+        int t = indice(destino);
+        int[] padre = new int[nomCiudades.length];
+        boolean[] visitado = new boolean[nomCiudades.length];
+        for (int i = 0; i < padre.length; i++) padre[i] = -1;
+
+        Queue<Integer> cola = new ArrayDeque<>();
+        visitado[s] = true;
+        cola.add(s);
+
+        while (!cola.isEmpty()) {
+            int v = cola.poll();
+            if (v == t) break;
+            for (int w : lista.get(v)) {
+                if (!visitado[w]) {
+                    visitado[w] = true;
+                    padre[w] = v;
+                    cola.add(w);
+                }
+            }
+        }
+
+        List<String> camino = new ArrayList<>();
+        for (int v = t; v != -1; v = padre[v]) {
+            camino.add(0, nomCiudades[v]);
+        }
+        return String.join(" -> ", camino) + " (" + (camino.size() - 1) + " tramos)";
+    }
+
+    // Imprime la lista de adyacencia con flechas igual que en el HTML de la Semana 4
+    public String imprimirListaFlechas() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < nomCiudades.length; i++) {
+            sb.append("  ").append(nomCiudades[i]).append(" -> ");
+            List<Integer> vecinos = lista.get(i);
+            for (int k = 0; k < vecinos.size(); k++) {
+                if (k > 0) sb.append(", ");
+                sb.append(nomCiudades[vecinos.get(k)]);
+            }
+            sb.append("\\n");
+        }
+        return sb.toString();
+    }
+}`,
+    funciones: [
+      {
+        titulo: "Atributos y Constructor del Grafo",
+        firma: "nomCiudades[] y List<List<Integer>> lista / public clsGrafoRutas()",
+        badge: "Lineas 8 - 16",
+        color: "amber",
+        recibe: "Nada. Inicializa las estructuras para las 7 ciudades fijas de la región Puno.",
+        hace: "Guarda los nombres en el arreglo <code>nomCiudades</code> (0: JULIACA, 1: PUNO, 2: LAMPA, 3: PUCARA, 4: AYAVIRI, 5: AZANGARO, 6: HUANCANE) y en el constructor crea 7 listas vacías dentro de <code>lista</code> para almacenar los vecinos de cada provincia (Lista de Adyacencia).",
+        devuelve: "El grafo inicializado y listo para recibir carreteras."
+      },
+      {
+        titulo: "Búsqueda de Índice y Agregar Arista (No Dirigido)",
+        firma: "public int indice(String nombre) / public void agregarArista(String a, String b)",
+        badge: "Lineas 22 - 35",
+        color: "cyan",
+        recibe: "Los nombres de las ciudades a buscar o conectar (ej. <code>\"JULIACA\"</code> y <code>\"PUNO\"</code>).",
+        hace: "<code>indice()</code> busca en qué posición del arreglo está la ciudad (de 0 a 6). Luego <code>agregarArista(a, b)</code> obtiene los índices <code>i</code> y <code>j</code> y guarda la conexión en <b>doble sentido</b>: <code>lista.get(i).add(j)</code> y <code>lista.get(j).add(i)</code>, porque por una carretera se puede viajar de ida y de vuelta.",
+        devuelve: "<code>indice</code> devuelve un <code>int</code>; <code>agregarArista</code> es <code>void</code>."
+      },
+      {
+        titulo: "⭐ Función Estrella: Camino Más Corto con BFS y Cola FIFO",
+        firma: "public String caminoMasCortoBfs(String origen, String destino)",
+        badge: "Lineas 38 - 67",
+        color: "emerald",
+        recibe: "La ciudad de partida <code>origen</code> y la ciudad de llegada <code>destino</code>.",
+        hace: "1° Si origen y destino son iguales, retorna <code>0 tramos</code>.<br/>2° Crea el arreglo <code>padre[]</code> lleno de <code>-1</code> y el arreglo <code>visitado[]</code> en <code>false</code>.<br/>3° Crea la <b>Cola FIFO</b> (<code>Queue&lt;Integer&gt; cola = new ArrayDeque&lt;&gt;()</code>), marca el origen <code>s</code> como visitado y lo encola.<br/>4° En el bucle <code>while (!cola.isEmpty())</code> saca el frente con <code>cola.poll()</code>; si ya es el destino <code>t</code>, hace <code>break</code>. Si no, recorre todos sus vecinos <code>w</code> no visitados, los marca, anota quién los descubrió (<code>padre[w] = v</code>) y los mete a la cola.<br/>5° Finalmente reconstruye el camino del destino al origen siguiendo el arreglo <code>padre</code> e insertando al inicio con <code>camino.add(0, nomCiudades[v])</code>.<br/><span class='text-amber-300 font-semibold'>Nota importante:</span> Verifica que en la línea 66 esté escrito <code>(camino.size() - 1)</code> en una sola línea.",
+        devuelve: "Un texto con flechas y el número de paradas: <code>\"LAMPA -> JULIACA -> PUCARA -> AYAVIRI (3 tramos)\"</code>."
+      },
+      {
+        titulo: "Impresión de la Lista de Adyacencia",
+        firma: "public String imprimirListaFlechas()",
+        badge: "Lineas 70 - 82",
+        color: "amber",
+        recibe: "Nada.",
+        hace: "Recorre con un bucle <code>for</code> las 7 provincias y concatena al lado de cada una los nombres de todas sus ciudades vecinas separadas por comas.",
+        devuelve: "El mapa textual de conexiones para mostrarlo en la parte inferior de <code>txtResul</code>."
+      }
+    ]
+  },
+
+  frm: {
+    archivo: "frmEncomiendas.java",
+    codigo: `import javax.swing.*;
+
+public class frmEncomiendas extends JFrame {
+
+    private JPanel jpPrin;
+    private JPanel jpTexto;
+    private JPanel jpBoton;
+    private JScrollPane jsScroll; // Si borraste jsScroll del form, borra también esta línea
+    private JTextField txtCodigo;
+    private JTextField txtDest;
+    private JComboBox<String> cbxOrigen;
+    private JComboBox<String> cbxDestino;
+    private JButton btnIns;
+    private JButton btnBuscar;
+    private JButton btnEli;
+    private JButton btnMos;
+    private JTextArea txtResul;
+
+    // Recibe el Árbol y el Grafo ya creados desde clsMain
+    public frmEncomiendas(clsArbolAbb arbol, clsGrafoRutas grafo) {
+        setTitle("Sistema de Encomiendas (ABB + Grafo BFS)");
+        setContentPane(jpPrin);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(650, 520);
+        setLocationRelativeTo(null);
+
+        // Llenamos los combos con las ciudades del grafo
+        for (String c : grafo.getNomCiudades()) {
+            cbxOrigen.addItem(c);
+            cbxDestino.addItem(c);
+        }
+
+        // Mostramos los datos iniciales al abrir
+        mostrarResumen(arbol, grafo, "Datos iniciales cargados desde clsMain.");
+
+        // 1. BOTÓN INSERTAR
+        btnIns.addActionListener(e -> {
+            int cod = Integer.parseInt(txtCodigo.getText().trim());
+            String dest = txtDest.getText().trim();
+            String ori = cbxOrigen.getSelectedItem().toString();
+            String fin = cbxDestino.getSelectedItem().toString();
+
+            arbol.insertar(new clsEncomienda(cod, dest, ori, fin));
+            String ruta = grafo.caminoMasCortoBfs(ori, fin);
+            mostrarResumen(arbol, grafo, "Insertado código " + cod + " | Ruta BFS: " + ruta);
+        });
+
+        // 2. BOTÓN BUSCAR
+        btnBuscar.addActionListener(e -> {
+            int cod = Integer.parseInt(txtCodigo.getText().trim());
+            clsEncomienda enc = arbol.buscar(cod);
+
+            if (enc != null) {
+                String caminoArbol = arbol.obtenerCaminoBusqueda(cod);
+                String rutaGrafo = grafo.caminoMasCortoBfs(enc.getCiudadOrigen(), enc.getCiudadDestino());
+
+                txtResul.setText(
+                        "ENCOMIENDA ENCONTRADA:\\n" +
+                                "  Datos        : " + enc.obtenerResumenTexto() + "\\n" +
+                                "  Saltos en ABB: " + caminoArbol + "\\n" +
+                                "  Ruta en Grafo: " + rutaGrafo
+                );
+            } else {
+                txtResul.setText("El código " + cod + " NO existe en el árbol.");
+            }
+        });
+
+        // 3. BOTÓN ELIMINAR
+        btnEli.addActionListener(e -> {
+            int cod = Integer.parseInt(txtCodigo.getText().trim());
+            arbol.eliminar(cod);
+            mostrarResumen(arbol, grafo, "Se eliminó el código " + cod);
+        });
+
+        // 4. BOTÓN MOSTRAR TODO
+        btnMos.addActionListener(e -> {
+            mostrarResumen(arbol, grafo, "Listado completo actualizado:");
+        });
+    }
+
+    private void mostrarResumen(clsArbolAbb arbol, clsGrafoRutas grafo, String aviso) {
+        txtResul.setText(
+                aviso + "\\n\\n" +
+                        "1. ÁRBOL ABB EN ORDEN (INORDEN CON FLECHAS):\\n" +
+                        arbol.obtenerInordenFlechas() + "\\n" +
+                        "2. LISTA DE ADYACENCIA DEL GRAFO (CONEXIONES):\\n" +
+                        grafo.imprimirListaFlechas()
+        );
+    }
+}`,
+    funciones: [
+      {
+        titulo: "Atributos Enlazados al Archivo .form",
+        firma: "jpPrin, txtCodigo, txtDest, cbxOrigen, cbxDestino, btnIns, btnBuscar, btnEli, btnMos, txtResul",
+        badge: "Lineas 5 - 17",
+        color: "amber",
+        recibe: "Enlace automático del GUI Designer de IntelliJ IDEA.",
+        hace: "Cada variable coincide exactamente con el <code>field name</code> que pusiste en <code>frmEncomiendas.form</code>. Gracias a eso no hace falta posicionar botones a mano con coordenadas.",
+        devuelve: "Controles visuales listos para usarse en el constructor."
+      },
+      {
+        titulo: "Constructor de la Ventana y Llenado de Combos",
+        firma: "public frmEncomiendas(clsArbolAbb arbol, clsGrafoRutas grafo)",
+        badge: "Lineas 20 - 34",
+        color: "cyan",
+        recibe: "El objeto <code>arbol</code> y el objeto <code>grafo</code> ya creados y cargados desde <code>main.java</code>.",
+        hace: "Asigna el panel principal con <code>setContentPane(jpPrin)</code>, le da tamaño <code>650x520</code>, centra la ventana con <code>setLocationRelativeTo(null)</code> y llena automáticamente los dos <code>JComboBox</code> recorriendo <code>grafo.getNomCiudades()</code>.",
+        devuelve: "La ventana configurada y mostrando los 4 paquetes iniciales."
+      },
+      {
+        titulo: "Eventos de los 4 Botones (Lambdas e -> { ... })",
+        firma: "btnIns, btnBuscar, btnEli, btnMos (.addActionListener)",
+        badge: "Lineas 37 - 80",
+        color: "emerald",
+        recibe: "El clic del usuario sobre cualquiera de los 4 botones.",
+        hace: "• <b>btnIns:</b> Lee código, destinatario, origen y destino; inserta en el ABB y calcula la ruta BFS.<br/>• <b>btnBuscar:</b> Busca el código en el ABB; si lo halla, muestra sus datos, los saltos que dio desde la raíz del árbol y el camino más corto en el grafo.<br/>• <b>btnEli:</b> Borra el código del ABB aplicando los 3 casos.<br/>• <b>btnMos:</b> Refresca la pantalla completa.",
+        devuelve: "Actualiza inmediatamente el contenido de <code>txtResul</code>."
+      },
+      {
+        titulo: "Método Auxiliar mostrarResumen",
+        firma: "private void mostrarResumen(clsArbolAbb arbol, clsGrafoRutas grafo, String aviso)",
+        badge: "Lineas 83 - 91",
+        color: "amber",
+        recibe: "El árbol, el grafo y un mensaje de encabezado <code>aviso</code>.",
+        hace: "Evita repetir código en los botones: junta el mensaje superior, el listado Inorden del árbol ABB y la lista de adyacencia del grafo en el cuadro <code>txtResul</code>.",
+        devuelve: "<code>void</code> (pinta el reporte en pantalla)."
+      }
+    ]
+  },
+
+  main: {
+    archivo: "main.java",
+    codigo: `import javax.swing.*;
+
+public class main {
+
+    public static void main(String[] args) {
+        // 1. Ponemos el diseño limpio de Windows para quitar ese color gris antiguo de Swing
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ignored) {
+        }
+
+        // 2. Creamos la Estructura 1: Grafo de Rutas y agregamos las 8 carreteras (Semana 4)
+        clsGrafoRutas rutasPuno = new clsGrafoRutas();
+        rutasPuno.agregarArista("JULIACA", "PUNO");
+        rutasPuno.agregarArista("JULIACA", "LAMPA");
+        rutasPuno.agregarArista("JULIACA", "PUCARA");
+        rutasPuno.agregarArista("PUCARA", "AYAVIRI");
+        rutasPuno.agregarArista("JULIACA", "AZANGARO");
+        rutasPuno.agregarArista("AZANGARO", "HUANCANE");
+        rutasPuno.agregarArista("JULIACA", "HUANCANE");
+        rutasPuno.agregarArista("AZANGARO", "AYAVIRI");
+
+        // 3. Creamos la Estructura 2: Árbol ABB y cargamos 4 encomiendas de prueba (Semana 3)
+        clsArbolAbb arbolEncomiendas = new clsArbolAbb();
+        arbolEncomiendas.insertar(new clsEncomienda(50, "Carlos Quispe", "JULIACA", "PUNO"));
+        arbolEncomiendas.insertar(new clsEncomienda(30, "Ana Mamani", "LAMPA", "AYAVIRI"));
+        arbolEncomiendas.insertar(new clsEncomienda(70, "Luis Condori", "PUNO", "HUANCANE"));
+        arbolEncomiendas.insertar(new clsEncomienda(20, "Elena Flores", "JULIACA", "AZANGARO"));
+
+        // 4. Abrimos la ventana pasándole el Árbol y el Grafo ya cargados
+        SwingUtilities.invokeLater(() -> {
+            frmEncomiendas ventana = new frmEncomiendas(arbolEncomiendas, rutasPuno);
+            ventana.setVisible(true);
+        });
+    }
+}`,
+    funciones: [
+      {
+        titulo: "1. Estilo Nativo del Sistema Operativo (LookAndFeel)",
+        firma: "UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());",
+        badge: "Lineas 7 - 10",
+        color: "amber",
+        recibe: "El nombre del estilo visual del sistema operativo actual (Windows).",
+        hace: "Reemplaza el aspecto 'Metal' gris antiguo de Java por controles nativos modernos de Windows.",
+        devuelve: "Aplica el diseño limpio a todas las ventanas que se creen después."
+      },
+      {
+        titulo: "2. Creación y Poblado del Grafo Regional (Semana 4)",
+        firma: "clsGrafoRutas rutasPuno = new clsGrafoRutas(); + 8 llamadas a agregarArista(...)",
+        badge: "Lineas 13 - 22",
+        color: "cyan",
+        recibe: "Los pares de ciudades que tienen carretera directa.",
+        hace: "Construye el mapa real de conexiones de la región Puno: conecta Juliaca con Puno, Lampa, Pucará, Azángaro y Huancané; conecta Pucará con Ayaviri; y cierra los ciclos de Azángaro con Huancané y Ayaviri.",
+        devuelve: "El objeto <code>rutasPuno</code> con su lista de adyacencia completa."
+      },
+      {
+        titulo: "3. Creación y Poblado Inicial del Árbol ABB (Semana 3)",
+        firma: "clsArbolAbb arbolEncomiendas = new clsArbolAbb(); + 4 llamadas a insertar(...)",
+        badge: "Lineas 25 - 29",
+        color: "emerald",
+        recibe: "4 objetos <code>clsEncomienda</code> con códigos 50, 30, 70 y 20.",
+        hace: "Arma el árbol inicial en memoria: <b>50</b> queda como raíz; <b>30</b> va como hijo izquierdo de 50; <b>70</b> va como hijo derecho de 50; y <b>20</b> va como hijo izquierdo de 30.",
+        devuelve: "El árbol listo para consultar desde que se abre la ventana."
+      },
+      {
+        titulo: "4. Lanzamiento Seguro de la Ventana Swing",
+        firma: "SwingUtilities.invokeLater(() -> { new frmEncomiendas(...).setVisible(true); });",
+        badge: "Lineas 32 - 35",
+        color: "amber",
+        recibe: "El árbol <code>arbolEncomiendas</code> y el grafo <code>rutasPuno</code>.",
+        hace: "Inicia el hilo de interfaz gráfica de Java (EDT), le inyecta las dos estructuras por constructor a <code>frmEncomiendas</code> y muestra la ventana en pantalla.",
+        devuelve: "La aplicación en ejecución."
+      }
+    ]
+  }
+};
+
+/* ================= RESALTADOR DE SINTAXIS JAVA ================= */
+function colorearJava(codigo) {
+  const re = /(\/\/.*$)|("(?:[^"\\]|\\.)*")|\b(public|private|static|int|boolean|void|class|new|return|if|else|while|for|null|this|import|break|try|catch)\b|\b(String|List|ArrayList|Queue|ArrayDeque|StringBuilder|Integer|JFrame|JPanel|JScrollPane|JTextField|JComboBox|JButton|JTextArea|UIManager|SwingUtilities|clsEncomienda|clsArbolAbb|clsGrafoRutas|frmEncomiendas|Nodo)\b|\b(\d+)\b/g;
+  return codigo.split("\n").map(linea => {
+    let out = "", ult = 0, m;
+    while ((m = re.exec(linea)) !== null) {
+      out += esc(linea.slice(ult, m.index));
+      const cls = m[1] ? "com" : m[2] ? "str" : m[3] ? "kw" : m[4] ? "typ" : "num";
+      out += `<span class="${cls}">${esc(m[0])}</span>`;
+      ult = re.lastIndex;
+    }
+    out += esc(linea.slice(ult));
+    return `<span class="code-line">${out || " "}</span>`;
+  }).join("");
+}
+
+/* ================= RENDERIZADO DE PESTAÑAS Y BUSCADOR ================= */
+let tabActual = "encomienda";
+
+function renderizarTab(clave, filtro = "") {
+  tabActual = clave;
+  const data = CLASES_DATA[clave];
+  document.getElementById("codeFileTitle").textContent = data.archivo;
+  document.getElementById("codeDisplay").innerHTML = colorearJava(data.codigo);
+
+  // Actualizar estado visual de los botones de pestañas
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    const activo = btn.dataset.tab === clave;
+    btn.className = activo
+      ? "tab-btn flex-1 min-w-[160px] py-2.5 px-4 rounded-xl font-extrabold text-xs sm:text-sm transition bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
+      : "tab-btn flex-1 min-w-[160px] py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition text-slate-300 hover:text-amber-400 hover:bg-slate-800/60";
+  });
+
+  const contenedor = document.getElementById("explanationCards");
+  const q = filtro.trim().toLowerCase();
+
+  // Si hay texto en el buscador, buscar en TODAS las clases; si no, mostrar las de la pestaña actual
+  let listaMostrar = [];
+  if (q.length > 0) {
+    Object.entries(CLASES_DATA).forEach(([k, obj]) => {
+      obj.funciones.forEach(fn => {
+        const texto = (fn.titulo + " " + fn.firma + " " + fn.hace + " " + obj.archivo).toLowerCase();
+        if (texto.includes(q)) listaMostrar.push({ ...fn, archivoOrigen: obj.archivo, tabKey: k });
+      });
+    });
+  } else {
+    listaMostrar = data.funciones.map(fn => ({ ...fn, archivoOrigen: data.archivo, tabKey: clave }));
+  }
+
+  if (listaMostrar.length === 0) {
+    contenedor.innerHTML = `<div class="rounded-2xl p-6 border border-slate-800 card-surface text-center text-slate-400 text-sm">No se encontraron funciones que coincidan con "<b>${esc(filtro)}</b>".</div>`;
+    return;
+  }
+
+  const badgeColors = {
+    amber: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+    emerald: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+    cyan: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+  };
+
+  contenedor.innerHTML = listaMostrar.map(fn => `
+    <article class="rounded-2xl p-5 border border-slate-800 hover:border-amber-500/40 card-surface transition space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 class="text-base sm:text-lg font-extrabold text-white">${fn.titulo}</h3>
+        <div class="flex items-center gap-2">
+          ${q ? `<button onclick="activarTab('${fn.tabKey}')" class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-slate-800 text-amber-300 border border-slate-700">${fn.archivoOrigen}</button>` : ""}
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-mono border ${badgeColors[fn.color] || badgeColors.amber}">${fn.badge}</span>
+        </div>
+      </div>
+
+      <div class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800/90 font-mono text-xs text-amber-300 overflow-x-auto">
+        ${esc(fn.firma)}
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+        <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80">
+          <span class="font-bold text-amber-400 uppercase block mb-1">📥 Qué recibe / Parámetros:</span>
+          <span class="text-slate-300">${fn.recibe}</span>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/70 border border-slate-800/80">
+          <span class="font-bold text-emerald-400 uppercase block mb-1">📤 Qué devuelve / Retorno:</span>
+          <span class="text-slate-300">${fn.devuelve}</span>
+        </div>
+      </div>
+
+      <div class="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/60 text-xs sm:text-sm text-slate-200 leading-relaxed">
+        <span class="font-bold text-cyan-300 uppercase text-xs block mb-1">⚙️ Qué hace línea por línea:</span>
+        ${fn.hace}
+      </div>
+    </article>
+  `).join("");
+}
+
+function activarTab(clave) {
+  document.getElementById("inputBuscarFuncion").value = "";
+  renderizarTab(clave);
+  document.getElementById("sec-clases").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.getElementById("inputBuscarFuncion").value = "";
+    renderizarTab(btn.dataset.tab);
+  });
+});
+
+document.getElementById("inputBuscarFuncion").addEventListener("input", e => {
+  renderizarTab(tabActual, e.target.value);
+});
+
+document.getElementById("btnCopyCode").addEventListener("click", function() {
+  const txt = CLASES_DATA[tabActual].codigo;
+  const temp = document.createElement("textarea");
+  temp.value = txt;
+  document.body.appendChild(temp);
+  temp.select();
+  document.execCommand("copy");
+  temp.remove();
+  const original = this.textContent;
+  this.textContent = "✓ ¡Copiado!";
+  setTimeout(() => this.textContent = original, 2000);
+});
+
+/* ================= LÓGICA DEL SIMULADOR INTERACTIVO EN VIVO ================= */
+const nomCiudades = ["JULIACA", "PUNO", "LAMPA", "PUCARA", "AYAVIRI", "AZANGARO", "HUANCANE"];
+const lista = nomCiudades.map(() => []);
+const indice = nom => nomCiudades.indexOf(nom);
+const agregarArista = (a, b) => { const i = indice(a), j = indice(b); lista[i].push(j); lista[j].push(i); };
+
+agregarArista("JULIACA", "PUNO");
+agregarArista("JULIACA", "LAMPA");
+agregarArista("JULIACA", "PUCARA");
+agregarArista("PUCARA", "AYAVIRI");
+agregarArista("JULIACA", "AZANGARO");
+agregarArista("AZANGARO", "HUANCANE");
+agregarArista("JULIACA", "HUANCANE");
+agregarArista("AZANGARO", "AYAVIRI");
+
+function caminoMasCortoBfs(origen, destino) {
+  if (origen === destino) return `${origen} -> ${destino} (0 tramos)`;
+  const s = indice(origen), t = indice(destino);
+  const padre = Array(nomCiudades.length).fill(-1), visitado = Array(nomCiudades.length).fill(false);
+  const cola = [s]; visitado[s] = true;
+  while (cola.length) {
+    const v = cola.shift();
+    if (v === t) break;
+    for (const w of lista[v]) {
+      if (!visitado[w]) { visitado[w] = true; padre[w] = v; cola.push(w); }
+    }
+  }
+  const camino = [];
+  for (let v = t; v !== -1; v = padre[v]) camino.unshift(nomCiudades[v]);
+  return `${camino.join(" -> ")} (${camino.length - 1} tramos)`;
+}
+
+function imprimirListaFlechas() {
+  return nomCiudades.map((c, i) => `  ${c} -> ${lista[i].map(k => nomCiudades[k]).join(", ")}`).join("\n") + "\n";
+}
+
+let raizSim = null;
+const resumenEnc = d => `[${d.cod} | Cliente: ${d.dest} | Ruta: ${d.ori} -> ${d.fin}]`;
+
+function insertarRec(n, enc) {
+  if (!n) return { dato: enc, izq: null, der: null };
+  if (enc.cod < n.dato.cod) n.izq = insertarRec(n.izq, enc);
+  else if (enc.cod > n.dato.cod) n.der = insertarRec(n.der, enc);
+  return n;
+}
+function buscarRec(n, cod) {
+  if (!n) return null;
+  if (cod === n.dato.cod) return n.dato;
+  return cod < n.dato.cod ? buscarRec(n.izq, cod) : buscarRec(n.der, cod);
+}
+function obtenerCaminoBusqueda(cod) {
+  let s = "Raíz ", act = raizSim;
+  while (act) {
+    s += act.dato.cod;
+    if (cod === act.dato.cod) break;
+    s += " -> ";
+    act = cod < act.dato.cod ? act.izq : act.der;
+  }
+  return s;
+}
+function minimo(n) { while (n.izq) n = n.izq; return n; }
+function eliminarRec(n, cod) {
+  if (!n) return null;
+  if (cod < n.dato.cod) n.izq = eliminarRec(n.izq, cod);
+  else if (cod > n.dato.cod) n.der = eliminarRec(n.der, cod);
+  else {
+    if (!n.izq) return n.der;
+    if (!n.der) return n.izq;
+    const suc = minimo(n.der);
+    n.dato = suc.dato;
+    n.der = eliminarRec(n.der, suc.dato.cod);
+  }
+  return n;
+}
+function obtenerInordenFlechas() {
+  if (!raizSim) return "(Árbol vacío)\n";
+  let out = "";
+  (function ino(n) {
+    if (!n) return;
+    ino(n.izq);
+    out += ` -> ${resumenEnc(n.dato)}\n`;
+    ino(n.der);
+  })(raizSim);
+  return out;
+}
+
+function cargarInicialesSim() {
+  raizSim = null;
+  [
+    { cod: 50, dest: "Carlos Quispe", ori: "JULIACA", fin: "PUNO" },
+    { cod: 30, dest: "Ana Mamani", ori: "LAMPA", fin: "AYAVIRI" },
+    { cod: 70, dest: "Luis Condori", ori: "PUNO", fin: "HUANCANE" },
+    { cod: 20, dest: "Elena Flores", ori: "JULIACA", fin: "AZANGARO" }
+  ].forEach(e => { raizSim = insertarRec(raizSim, e); });
+}
+
+const selOri = document.getElementById("simOri"), selFin = document.getElementById("simFin"), outEl = document.getElementById("simOut");
+nomCiudades.forEach(c => {
+  selOri.insertAdjacentHTML("beforeend", `<option value="${c}">${c}</option>`);
+  selFin.insertAdjacentHTML("beforeend", `<option value="${c}">${c}</option>`);
+});
+selOri.value = "LAMPA"; selFin.value = "AYAVIRI";
+
+function mostrarResumenSim(aviso) {
+  outEl.textContent = `${aviso}\n\n1. ÁRBOL ABB EN ORDEN (INORDEN CON FLECHAS):\n${obtenerInordenFlechas()}\n2. LISTA DE ADYACENCIA DEL GRAFO (CONEXIONES):\n${imprimirListaFlechas()}`;
+}
+
+document.getElementById("bSimIns").onclick = () => {
+  const cod = parseInt(document.getElementById("simCod").value, 10);
+  const dest = document.getElementById("simDest").value.trim() || "Cliente";
+  const ori = selOri.value, fin = selFin.value;
+  if (isNaN(cod)) return;
+  raizSim = insertarRec(raizSim, { cod, dest, ori, fin });
+  const ruta = caminoMasCortoBfs(ori, fin);
+  mostrarResumenSim(`Insertado código ${cod} | Ruta BFS: ${ruta}`);
+};
+
+document.getElementById("bSimBus").onclick = () => {
+  const cod = parseInt(document.getElementById("simCod").value, 10);
+  const enc = buscarRec(raizSim, cod);
+  if (enc) {
+    outEl.textContent = `ENCOMIENDA ENCONTRADA:\n  Datos        : ${resumenEnc(enc)}\n  Saltos en ABB: ${obtenerCaminoBusqueda(cod)}\n  Ruta en Grafo: ${caminoMasCortoBfs(enc.ori, enc.fin)}`;
+  } else {
+    outEl.textContent = `El código ${cod} NO existe en el árbol.`;
+  }
+};
+
+document.getElementById("bSimEli").onclick = () => {
+  const cod = parseInt(document.getElementById("simCod").value, 10);
+  if (isNaN(cod)) return;
+  raizSim = eliminarRec(raizSim, cod);
+  mostrarResumenSim(`Se eliminó el código ${cod}`);
+};
+
+document.getElementById("bSimMos").onclick = () => {
+  mostrarResumenSim("Listado completo actualizado:");
+};
+
+document.getElementById("btnSimReset").onclick = () => {
+  cargarInicialesSim();
+  mostrarResumenSim("Datos iniciales restaurados desde main.java.");
+};
+
+function probarBusquedaRapida(cod) {
+  document.getElementById("simCod").value = cod;
+  document.getElementById("bSimBus").click();
+}
+
+/* ================= TEMA CLARO / OSCURO ================= */
+document.getElementById("btnTheme").addEventListener("click", () => {
+  const html = document.documentElement;
+  const esOscuro = html.classList.toggle("dark");
+  document.body.className = esOscuro
+    ? "bg-slate-950 text-slate-100 font-sans antialiased transition-colors duration-300"
+    : "bg-slate-100 text-slate-900 font-sans antialiased transition-colors duration-300";
+  document.getElementById("themeIcon").textContent = esOscuro ? "☀️" : "🌙";
+  document.getElementById("themeText").textContent = esOscuro ? "Modo Claro" : "Modo Oscuro";
+});
+
+// Inicializar vista
+cargarInicialesSim();
+mostrarResumenSim("Datos iniciales cargados desde clsMain.");
+renderizarTab("encomienda");
+</script>
+</body>
+</html>
